@@ -20,6 +20,7 @@ import org.nd4j.linalg.lossfunctions.LossFunctions;*/
 
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
+import org.apache.spark.sql.SparkSession;
 /**
  * This basic example shows how to manually create a DataSet and train it to an
  * basic Network.
@@ -33,7 +34,11 @@ import org.nd4j.linalg.factory.Nd4j;
  * @author Peter Großmann
  */
 public class Main {
+
     public static void main(String[] args) {
+
+        SparkSession ss = SparkSession.builder().master("local[4]").appName("Test").getOrCreate();
+
 
         // list off input values, 4 training samples with data for 2
         // input-neurons each
