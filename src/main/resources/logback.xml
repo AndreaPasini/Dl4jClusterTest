@@ -1,0 +1,49 @@
+<!--
+# Andrea Pasini
+# Francesco Ventura
+#
+# This file (logback.xml) contains the configuration for the logger (sl4j library, used by dl4j).
+# ConsoleAppender shows the log output directly to the console.
+# This file must be put in the main/resources folder (in order to be read by the logger library).
+# It should also be included into the generated output jar file.
+-->
+
+<configuration>
+    <!-- Save log output to file "mainLog.log" -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>logs/mainLog.log</file>
+        <encoder>
+            <pattern>%date - [%level] - from %logger in %thread
+                %n%message%n%xException%n</pattern>
+        </encoder>
+    </appender>
+    <!-- Show log output in the console -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern> %logger{15} - %message%n%xException{5}
+            </pattern>
+        </encoder>
+    </appender>
+
+    <!-- Error-only loggers: -->
+    <logger name="org.deeplearning4j" level="ERROR" />
+    <logger name="org.apache.spark" level="ERROR" />
+    <logger name="org.spark_project" level="ERROR" />
+    <logger name="org.datavec" level="ERROR" />
+    <logger name="org.nd4j" level="ERROR" />
+    <logger name="org.reflections" level="ERROR" />
+    <logger name="org.apache.hadoop" level="ERROR" />
+    <!-- Hidden loggers: -->
+    <logger name="org.apache.catalina.core" level="OFF" />
+    <logger name="org.springframework" level="OFF" />
+    <logger name="org.canova" level="OFF" />
+    <logger name="opennlp.uima.util" level="OFF" />
+    <logger name="org.apache.uima" level="OFF" />
+    <logger name="org.cleartk" level="OFF" />
+
+    <!-- Global Logging level (ERROR, WARNING, INFO) -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="FILE" />
+    </root>
+</configuration>
