@@ -17,179 +17,169 @@ import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.lossfunctions.LossFunctions;*/
 
-
+import org.datavec.image.mnist.MnistDbFile;
+import org.datavec.image.mnist.MnistImageFile;
+import org.datavec.image.mnist.MnistLabelFile;
+import org.datavec.image.mnist.MnistManager;
+import org.deeplearning4j.base.MnistFetcher;
+import org.deeplearning4j.datasets.fetchers.MnistDataFetcher;
+import org.deeplearning4j.eval.Evaluation;
+import org.deeplearning4j.spark.impl.multilayer.SparkDl4jMultiLayer;
+import org.deeplearning4j.spark.parameterserver.training.SharedTrainingMaster;
+import org.deeplearning4j.spark.api.RDDTrainingApproach;
+import org.deeplearning4j.spark.api.TrainingMaster;
+import org.nd4j.parameterserver.distributed.conf.VoidConfiguration;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.dataset.DataSet;
+import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.factory.Nd4j;
 import org.apache.spark.sql.SparkSession;
-/**
- * This basic example shows how to manually create a DataSet and train it to an
- * basic Network.
- * <p>
- * The network consists in 2 input-neurons, 1 hidden-layer with 4
- * hidden-neurons, and 2 output-neurons.
- * <p>
- * I choose 2 output neurons, (the first fires for false, the second fires for
- * true) because the Evaluation class needs one neuron per classification.
- *
- * @author Peter Großmann
- */
+import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import scala.collection.Seq;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import java.util.logging.XMLFormatter;
+
 public class Main {
+    private static String appName = "Dl4jApplication";
+    public static enum Master {local,remote}
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws MalformedURLException {
 
-        SparkSession ss = SparkSession.builder().master("local[4]").appName("Test").getOrCreate();
+        System.setProperty("log4j.configuration", new File("resources", "log4j.properties").toString());
 
 
-        // list off input values, 4 training samples with data for 2
-        // input-neurons each
-        INDArray input = Nd4j.zeros(4, 2);
+        //Select between local and remote master
+        Master selectMaster = Master.local;
 
-        // correspondending list with expected output values, 4 training samples
-        // with data for 2 output-neurons each
-        INDArray labels = Nd4j.zeros(4, 2);
+        int batchSizePerWorker=16;
+        int numEpochs = 3;
 
-        // create first dataset
-        // when first input=0 and second input=0
-        input.putScalar(new int[]{0, 0}, 0);
-        input.putScalar(new int[]{0, 1}, 0);
-        // then the first output fires for false, and the second is 0 (see class
-        // comment)
-        labels.putScalar(new int[]{0, 0}, 1);
-        labels.putScalar(new int[]{0, 1}, 0);
+        //Creating Spark Session
+        SparkSession ss;
+        if (selectMaster==Master.local)
+            ss = SparkSession.builder().master("local").appName(appName).getOrCreate();
+        else
+            ss =  SparkSession.builder().appName(appName).getOrCreate();
+        JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
 
-        // when first input=1 and second input=0
-        input.putScalar(new int[]{1, 0}, 1);
-        input.putScalar(new int[]{1, 1}, 0);
-        // then xor is true, therefore the second output neuron fires
-        labels.putScalar(new int[]{1, 0}, 0);
-        labels.putScalar(new int[]{1, 1}, 1);
+        try {
 
-        // same as above
-        input.putScalar(new int[]{2, 0}, 0);
-        input.putScalar(new int[]{2, 1}, 1);
-        labels.putScalar(new int[]{2, 0}, 0);
-        labels.putScalar(new int[]{2, 1}, 1);
+            //1. Read Dataset (MNIST)
 
-        // when both inputs fire, xor is false again - the first output should
-        // fire
-        input.putScalar(new int[]{3, 0}, 1);
-        input.putScalar(new int[]{3, 1}, 1);
-        labels.putScalar(new int[]{3, 0}, 1);
-        labels.putScalar(new int[]{3, 1}, 0);
+            //new MnistDbFile("../data/", "");
+            //new MnistImageFile(String name, String mode);
+            //new MnistLabelFile(String name, String mode);
 
-        System.out.println(labels);
+            System.setProperty("user.home","./data");
 
-        // create dataset object
-  /*      DataSet ds = new DataSet(input, labels);
+            //Features: 16x784x784 (batch, height, width)
+            //Labels:   16x10      (batch, nDigits)
+            DataSetIterator iterTrain = new MnistDataSetIterator(batchSizePerWorker, true, 12345);
+            DataSetIterator iterTest = new MnistDataSetIterator(batchSizePerWorker, true, 12345);
+            List<DataSet> trainDataList = new ArrayList<>();
+            List<DataSet> testDataList = new ArrayList<>();
+            while (iterTrain.hasNext()) {
+                trainDataList.add(iterTrain.next());
+            }
+            while (iterTest.hasNext()) {
+                testDataList.add(iterTest.next());
+            }
 
-        // Set up network configuration
-        NeuralNetConfiguration.Builder builder = new NeuralNetConfiguration.Builder();
-        // how often should the training set be run, we need something above
-        // 1000, or a higher learning-rate - found this values just by trial and
-        // error
-        builder.iterations(10000);
-        // learning rate
-        builder.learningRate(0.1);
-        // fixed seed for the random generator, so any run of this program
-        // brings the same results - may not work if you do something like
-        // ds.shuffle()
-        builder.seed(123);
-        // not applicable, this network is to small - but for bigger networks it
-        // can help that the network will not only recite the training data
-        builder.useDropConnect(false);
-        // a standard algorithm for moving on the error-plane, this one works
-        // best for me, LINE_GRADIENT_DESCENT or CONJUGATE_GRADIENT can do the
-        // job, too - it's an empirical value which one matches best to
-        // your problem
-        builder.optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT);
-        // init the bias with 0 - empirical value, too
-        builder.biasInit(0);
-        // from "http://deeplearning4j.org/architecture": The networks can
-        // process the input more quickly and more accurately by ingesting
-        // minibatches 5-10 elements at a time in parallel.
-        // this example runs better without, because the dataset is smaller than
-        // the mini batch size
-        builder.miniBatch(false);
 
-        // create a multilayer network with 2 layers (including the output
-        // layer, excluding the input payer)
-        ListBuilder listBuilder = builder.list();
+            JavaRDD < DataSet > trainData = sc.parallelize(trainDataList);
+            JavaRDD<DataSet> testData = sc.parallelize(testDataList);
 
-        DenseLayer.Builder hiddenLayerBuilder = new DenseLayer.Builder();
-        // two input connections - simultaneously defines the number of input
-        // neurons, because it's the first non-input-layer
-        hiddenLayerBuilder.nIn(2);
-        // number of outgooing connections, nOut simultaneously defines the
-        // number of neurons in this layer
-        hiddenLayerBuilder.nOut(4);
-        // put the output through the sigmoid function, to cap the output
-        // valuebetween 0 and 1
-        hiddenLayerBuilder.activation(Activation.SIGMOID);
-        // random initialize weights with values between 0 and 1
-        hiddenLayerBuilder.weightInit(WeightInit.DISTRIBUTION);
-        hiddenLayerBuilder.dist(new UniformDistribution(0, 1));
+            //2. Configure Neural network
 
-        // build and set as layer 0
-        listBuilder.layer(0, hiddenLayerBuilder.build());
+            MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+                    .seed(12345)
 
-        // MCXENT or NEGATIVELOGLIKELIHOOD (both are mathematically equivalent) work ok for this example - this
-        // function calculates the error-value (aka 'cost' or 'loss function value'), and quantifies the goodness
-        // or badness of a prediction, in a differentiable way
-        // For classification (with mutually exclusive classes, like here), use multiclass cross entropy, in conjunction
-        // with softmax activation function
-        Builder outputLayerBuilder = new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD);
-        // must be the same amout as neurons in the layer before
-        outputLayerBuilder.nIn(4);
-        // two neurons in this layer
-        outputLayerBuilder.nOut(2);
-        outputLayerBuilder.activation(Activation.SOFTMAX);
-        outputLayerBuilder.weightInit(WeightInit.DISTRIBUTION);
-        outputLayerBuilder.dist(new UniformDistribution(0, 1));
-        listBuilder.layer(1, outputLayerBuilder.build());
+                    .activation(Activation.LEAKYRELU)
+                    .weightInit(WeightInit.XAVIER)
+                    .updater(new Nesterovs(0.02))// To configure: .updater(Nesterovs.builder().momentum(0.9).build())
+                    .l2(1e-4)
+                    .list()
+                    .layer(0, new DenseLayer.Builder().nIn(28 * 28).nOut(500).build())
+                    .layer(1, new DenseLayer.Builder().nIn(500).nOut(100).build())
+                    .layer(2, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                            .activation(Activation.SOFTMAX).nIn(100).nOut(10).build())
+                    .pretrain(false).backprop(true)
+                    .build();
 
-        // no pretrain phase for this network
-        listBuilder.pretrain(false);
+            //Configuration for Spark training: see https://deeplearning4j.org/distributed for explanation of these configuration options
+            VoidConfiguration voidConfiguration = VoidConfiguration.builder()
 
-        // seems to be mandatory
-        // according to agibsonccc: You typically only use that with
-        // pretrain(true) when you want to do pretrain/finetune without changing
-        // the previous layers finetuned weights that's for autoencoders and
-        // rbms
-        listBuilder.backprop(true);
+                    /**
+                     * This can be any port, but it should be open for IN/OUT comms on all Spark nodes
+                     */
+                    //.unicastPort(40123)
 
-        // build and init the network, will check if everything is configured
-        // correct
-        MultiLayerConfiguration conf = listBuilder.build();
-        MultiLayerNetwork net = new MultiLayerNetwork(conf);
-        net.init();
+                    /**
+                     * if you're running this example on Hadoop/YARN, please provide proper netmask for out-of-spark comms
+                     */
+                   // .networkMask("10.1.1.0/24")
 
-        // add an listener which outputs the error every 100 parameter updates
-        net.setListeners(new ScoreIterationListener(100));
+                    /**
+                     * However, if you're running this example on Spark standalone cluster, you can rely on Spark internal addressing via $SPARK_PUBLIC_DNS env variables announced on each node
+                     */
+                    .controllerAddress((selectMaster==Master.local) ? "127.0.0.1" : null)
+                    .build();
 
-        // C&P from GravesLSTMCharModellingExample
-        // Print the number of parameters in the network (and for each layer)
-        Layer[] layers = net.getLayers();
-        int totalNumParams = 0;
-        for (int i = 0; i < layers.length; i++) {
-            int nParams = layers[i].numParams();
-            System.out.println("Number of parameters in layer " + i + ": " + nParams);
-            totalNumParams += nParams;
+            TrainingMaster tm = new SharedTrainingMaster.Builder(voidConfiguration, batchSizePerWorker)
+                    // encoding threshold. Please check https://deeplearning4j.org/distributed for details
+                    .updatesThreshold(1e-3)
+                    .rddTrainingApproach(RDDTrainingApproach.Direct)
+                    .batchSizePerWorker(batchSizePerWorker)
+
+                    // this option will enforce exactly 4 workers for each Spark node
+                    .workersPerNode(4)
+                    .build();
+
+            //Create the Spark network
+            SparkDl4jMultiLayer sparkNet = new SparkDl4jMultiLayer(sc, conf, tm);
+
+            //Execute training:
+            for (int i = 0; i < numEpochs; i++) {
+                sparkNet.fit(trainData);
+                log.info("Completed Epoch {}", i);
+            }
+
+            //Perform evaluation (distributed)
+            //        Evaluation evaluation = sparkNet.evaluate(testData);
+            Evaluation evaluation = sparkNet.doEvaluation(testData, 64, new Evaluation(10))[0]; //Work-around for 0.9.1 bug: see https://deeplearning4j.org/releasenotes
+            log.info("***** Evaluation *****");
+            log.info(evaluation.stats());
+
+            //Delete the temp training files, now that we are done with them
+            tm.deleteTempFiles(sc);
+
+            log.info("***** Example Complete *****");
+
         }
-        System.out.println("Total number of network parameters: " + totalNumParams);
+        catch (IOException ex) {
+            ex.printStackTrace();
+        }
 
-        // here the actual learning takes place
-        net.fit(ds);
-
-        // create output for every training sample
-        INDArray output = net.output(ds.getFeatureMatrix());
-        System.out.println(output);
-
-        // let Evaluation prints stats how often the right output had the
-        // highest value
-        Evaluation eval = new Evaluation(2);
-        eval.eval(ds.getLabels(), output);
-        System.out.println(eval.stats());
-*/
     }
 }
 

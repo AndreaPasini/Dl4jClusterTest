@@ -7,27 +7,59 @@
     <artifactId>ClusterTest1</artifactId>
     <version>1.0</version>
     <modelVersion>4.0.0</modelVersion>
+    <!-- For building jar with Maven -->
     <packaging>jar</packaging>
 
-    <name>DeepLearning4j Examples Parent</name>
-    <description>Examples of training different data sets</description>
-
-
     <dependencies>
+        <!-- Nd4j: nd-vectors -->
         <dependency>
             <groupId>org.nd4j</groupId>
             <artifactId>nd4j-native</artifactId>
             <version>0.9.1</version>
-
+        </dependency>
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>deeplearning4j-core</artifactId>
+            <version>0.9.1</version>
         </dependency>
 
+        <!-- Spark + dl4j -->
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>dl4j-spark_2.11</artifactId>
+            <version>0.9.1_spark_2</version>
+        </dependency>
+
+
+
+
+        <!--<dependency>
+            <groupId>org.nd4j</groupId>
+            <artifactId>nd4j-parameter-server</artifactId>
+            <version>0.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.nd4j</groupId>
+            <artifactId>nd4j-parameter-server-node_2.11</artifactId>
+            <version>0.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.nd4j</groupId>
+            <artifactId>nd4j-parameter-server-client</artifactId>
+            <version>0.9.1</version>
+        </dependency>-->
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>dl4j-spark-parameterserver_2.11</artifactId>
+            <version>0.9.1_spark_2</version>
+        </dependency>
+
+        <!-- Spark dependencies -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.11</artifactId>
             <version>2.2.0</version>
         </dependency>
-
-
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.11</artifactId>
@@ -39,6 +71,8 @@
     </dependencies>
 
 
+
+
     <build>
         <plugins>
             <plugin>
@@ -46,6 +80,7 @@
                 <artifactId>maven-assembly-plugin</artifactId>
 
                 <configuration>
+                    <!-- Add dependencies into jar file -->
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
@@ -63,6 +98,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.7</source>
+                    <target>1.7</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>
