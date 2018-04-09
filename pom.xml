@@ -26,28 +26,28 @@
 
     <dependencies>
         <!-- Logging (sl4j + logback) -->
-        <dependency>
+        <!--<dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
-        </dependency>
+        </dependency>-->
 
         <!-- Nd4j: nd-vectors -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.nd4j</groupId>
             <artifactId>nd4j-native</artifactId>
             <version>${nd4j.version}</version>
-        </dependency>
+        </dependency>-->
 
         <!-- Deeplearning library -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.deeplearning4j</groupId>
             <artifactId>deeplearning4j-core</artifactId>
             <version>${dl4j.version}</version>
-        </dependency>
+        </dependency>-->
 
         <!-- Spark + dl4j -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.deeplearning4j</groupId>
             <artifactId>dl4j-spark_${scala.version}</artifactId>
             <version>${dl4j.version}_spark_2</version>
@@ -58,17 +58,19 @@
             <artifactId>dl4j-spark-parameterserver_${scala.version}</artifactId>
             <version>${dl4j.version}_spark_2</version>
         </dependency>
-
+-->
         <!-- Spark dependencies -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.version}</artifactId>
             <version>${spark.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.version}</artifactId>
             <version>${spark.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

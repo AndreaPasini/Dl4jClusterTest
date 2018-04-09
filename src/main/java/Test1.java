@@ -1,3 +1,4 @@
+/*
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator;
@@ -24,11 +25,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+*/
+
 /**
  * Andrea Pasini
  * Francesco Ventura
  * Run a sample neural network on MNIST dataset.
  */
+/*
 public class Test1 {
     private static Logger log = LoggerFactory.getLogger(Test1.class);
     private int batchSizePerWorker = 16;
@@ -39,7 +43,7 @@ public class Test1 {
     /**
      * Constructor.
      */
-    public Test1(JavaSparkContext sc, boolean runLocal) {
+ /*   public Test1(JavaSparkContext sc, boolean runLocal) {
         this.sc = sc;
         this.runLocal = runLocal;
     }
@@ -47,13 +51,17 @@ public class Test1 {
     /**
      * Run a sample neural network on MNIST dataset.
      */
-    public void run(){
+  /*  public void run(){
 
 
         try {
 
             //1. Read Dataset (MNIST) into Spark RDD
-            System.setProperty("user.home","./data");
+            if (runLocal)
+                System.setProperty("user.home","./data");
+            else
+                System.setProperty("user.home","hdfs://user/pasini/data");
+
             log.info("Reading MNIST...");
             JavaRDD<DataSet> trainData = readMnist(true);
             JavaRDD<DataSet> testData = readMnist(false);
@@ -90,7 +98,7 @@ public class Test1 {
                     /**
                      * However, if you're running this example on Spark standalone cluster, you can rely on Spark internal addressing via $SPARK_PUBLIC_DNS env variables announced on each node
                      */
-                    .controllerAddress((runLocal) ? "127.0.0.1" : null)
+     /*               .controllerAddress((runLocal) ? "127.0.0.1" : null)
                     .build();
 
             TrainingMaster tm = new SharedTrainingMaster.Builder(voidConfiguration, batchSizePerWorker)
@@ -133,7 +141,7 @@ public class Test1 {
      * Read Local Mnist into JavaRDD
      * train=true for reading training set, otherwise test set
      */
-    private JavaRDD<DataSet> readMnist(boolean train) throws IOException {
+  /*  private JavaRDD<DataSet> readMnist(boolean train) throws IOException {
         //Features: 16x784x784 (batch, height, width)
         //Labels:   16x10      (batch, nDigits)
         DataSetIterator iter = new MnistDataSetIterator(batchSizePerWorker, train, 12345);
@@ -142,4 +150,4 @@ public class Test1 {
             dataList.add(iter.next());
         return sc.parallelize(dataList);
     }
-}
+}*/
