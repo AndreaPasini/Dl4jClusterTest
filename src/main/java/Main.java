@@ -1,7 +1,10 @@
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.input.PortableDataStream;
 import org.apache.spark.sql.SparkSession;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
@@ -35,7 +38,39 @@ public class Main {
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
         System.out.println("testprint");
 
+        JavaPairRDD<String, PortableDataStream> binaryRDD = sc.binaryFiles("hdfs://BigDataHA/user/pasini/data/MNIST/*");
+
+        JavaPairRDD<String,Integer> res = binaryRDD.mapValues(ds -> {
+            byte [] data = ds.toArray();
+            return data.length;
+        });
+        res.saveAsTextFile("outputSpark.txt");
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
         Configuration conf = sc.hadoopConfiguration();
+
+
+
+
+
+
+
+
+
+
         FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);
         boolean exists = fs.exists(new org.apache.hadoop.fs.Path("hdfs://BigDataHA/user/pasini/data/MNIST/t10k-images-idx3-ubyte"));
         if (exists) {
@@ -47,10 +82,10 @@ public class Main {
         }
 
         DataInputStream dis = fs.open(new org.apache.hadoop.fs.Path("hdfs://BigDataHA/user/pasini/data/MNIST/t10k-images-idx3-ubyte"));
-
+*/
 
         ////Read binary of mnist...
-        
+
 
 
 
