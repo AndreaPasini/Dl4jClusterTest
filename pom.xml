@@ -33,18 +33,18 @@
         </dependency>-->
 
         <!-- Nd4j: nd-vectors -->
-        <!--<dependency>
+        <dependency>
             <groupId>org.nd4j</groupId>
             <artifactId>nd4j-native</artifactId>
             <version>${nd4j.version}</version>
-        </dependency>-->
+        </dependency>
 
         <!-- Deeplearning library -->
-        <!--<dependency>
+        <dependency>
             <groupId>org.deeplearning4j</groupId>
             <artifactId>deeplearning4j-core</artifactId>
             <version>${dl4j.version}</version>
-        </dependency>-->
+        </dependency>
 
         <!-- Spark + dl4j -->
         <!--<dependency>
@@ -72,6 +72,13 @@
             <version>${spark.version}</version>
             <scope>provided</scope>
         </dependency>
+
+        <!--<dependency>-->
+            <!--<groupId>com.google.guava</groupId>-->
+            <!--<artifactId>guava</artifactId>-->
+            <!--<version>14.0.1</version>-->
+            <!--&lt;!&ndash;<scope>provided</scope>&ndash;&gt;-->
+        <!--</dependency>-->
     </dependencies>
 
     <build>
