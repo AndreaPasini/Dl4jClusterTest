@@ -5,8 +5,13 @@
 # POM file, to handle dependencies with Maven
 -->
 
+
+
+
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+
 
     <groupId>Dl4jCluster</groupId>
     <artifactId>ClusterTest1</artifactId>
@@ -22,6 +27,9 @@
         <spark.version>2.2.0</spark.version>
         <nd4j.version>0.9.1</nd4j.version>
         <dl4j.version>0.9.1</dl4j.version>
+
+        <ex.local>True</ex.local>
+        <!-- <Cluster>True</Cluster>-->
     </properties>
 
     <dependencies>
@@ -31,6 +39,20 @@
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
         </dependency>-->
+
+        <!-- Spark + dl4j -->
+        <!--<dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>dl4j-spark_${scala.version}</artifactId>
+            <version>${dl4j.version}_spark_2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>dl4j-spark-parameterserver_${scala.version}</artifactId>
+            <version>${dl4j.version}_spark_2</version>
+        </dependency>
+        -->
 
         <!-- Nd4j: nd-vectors -->
         <dependency>
@@ -45,41 +67,95 @@
             <artifactId>deeplearning4j-core</artifactId>
             <version>${dl4j.version}</version>
         </dependency>
-
-        <!-- Spark + dl4j -->
-        <!--<dependency>
-            <groupId>org.deeplearning4j</groupId>
-            <artifactId>dl4j-spark_${scala.version}</artifactId>
-            <version>${dl4j.version}_spark_2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.deeplearning4j</groupId>
-            <artifactId>dl4j-spark-parameterserver_${scala.version}</artifactId>
-            <version>${dl4j.version}_spark_2</version>
-        </dependency>
--->
-        <!-- Spark dependencies -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.version}</artifactId>
-            <version>${spark.version}</version>
-            <!--<scope>provided</scope>-->
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.version}</artifactId>
-            <version>${spark.version}</version>
-            <!--<scope>provided</scope>-->
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>14.0.1</version>
-            <!--<scope>provided</scope>-->
-        </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+        <id>Local</id>
+
+        <activation>
+            <property>
+                <name>ex.local</name>
+            </property>
+        </activation>
+
+
+
+
+        <dependencies>
+
+
+
+
+            <!-- Spark dependencies -->
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-core_${scala.version}</artifactId>
+                <version>${spark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql_${scala.version}</artifactId>
+                <version>${spark.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>14.0.1</version>
+            </dependency>
+        </dependencies>
+
+
+        </profile>
+
+
+
+        <profile>
+            <id>Cluster</id>
+
+            <activation>
+                <property>
+                    <name>Cluster</name>
+                </property>
+            </activation>
+
+
+            <dependencies>
+
+
+
+                <!-- Spark dependencies -->
+                <dependency>
+                    <groupId>org.apache.spark</groupId>
+                    <artifactId>spark-core_${scala.version}</artifactId>
+                    <version>${spark.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.spark</groupId>
+                    <artifactId>spark-sql_${scala.version}</artifactId>
+                    <version>${spark.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+
+                <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>14.0.1</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+
+
+        </profile>
+
+    </profiles>
+
+
+
+
+
 
     <build>
         <!-- Add Maven plugin to build a jar with the Main class and dependencies -->

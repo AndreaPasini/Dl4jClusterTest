@@ -43,7 +43,7 @@ public class Main {
     //private static Logger log = LoggerFactory.getLogger(Main.class);
 
     //Select between local and remote master
-    public static boolean runLocal = true;
+    public static boolean runLocal = false;
 
 
 
@@ -79,43 +79,19 @@ public class Main {
         Configuration conf = sc.hadoopConfiguration();
         FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);
 
-        List<INDArray> dsImages = new LinkedList<>();
-        List<INDArray> dsLabels = new LinkedList<>();
-
-        List<DataSet> images=new LinkedList<>();
-        int i=0;
-        ImageLoader imageLoader = new ImageLoader();
-        while (di.hdfsIterator.hasNext()){
-            LocatedFileStatus file = di.hdfsIterator.next();
-            Path path = file.getPath();
-
-            //Get image label
-            String label = path.getName().split("_")[1].split("\\.")[0];
-            INDArray labelVect = labels.get(label);
-
-            //Image vectorization
-            DataInputStream dis = fs.open(path);
-            INDArray img = imageLoader.asMatrix(dis);
-            dis.close();
-
-            //Add image and label to list
-            dsImages.add(img);
-            dsLabels.add(labelVect);
-
-            if (i>5)break;
-            i++;
+        List<DataSet> batches = new LinkedList<>();
+        for (int i=0; i<50; i++) {
+            batches.add(nextBatch(di, labels, fs, 1000));
+            System.out.println("batch: "+i+" "+batches.get(batches.size()-1).getFeatures().shape()[0]);
         }
 
-        //Generate DataSet
-        int[] featureShape = dsImages.get(0).shape();
-        int[] labelShape = dsLabels.get(0).shape();
-        DataSet imageDataset = new DataSet(Nd4j.create(dsImages,new int[]{dsImages.size(),featureShape[0],featureShape[1]}),
-                Nd4j.create(dsLabels, new int[]{dsLabels.size(), labelShape[1]}));
+        System.out.println("start parallelization");
 
+        //Create RDD with the dataset
+        JavaRDD<DataSet> datasetRDD = sc.parallelize(batches);
+        datasetRDD.map(d-> d.getFeatures().shape()[0]+" "+d.getFeatures().shape()[1]+" "+d.getFeatures().shape()[2]).saveAsTextFile("cifarOutput");
 
-        System.out.println("Features: " + imageDataset.getFeatures().shape()[0]+" "+imageDataset.getFeatures().shape()[1]+" "+imageDataset.getFeatures().shape()[2]+" ");
-        System.out.println("Labels: " + imageDataset.getLabels().shape()[0]+" "+imageDataset.getLabels().shape()[1]);
-
+        System.out.println("end parallelization");
 
 
 
@@ -230,6 +206,41 @@ public class Main {
         ss.close();
         //log.info("Spark Session closed.");
       //  System.exit(0);
+    }
+
+    public static DataSet nextBatch(DirectoryIterator di, Map<String, INDArray> labels, FileSystem fs, int batchSize) throws IOException {
+        List<INDArray> dsImages = new LinkedList<>();
+        List<INDArray> dsLabels = new LinkedList<>();
+
+        List<DataSet> images=new LinkedList<>();
+        int i=0;
+        ImageLoader imageLoader = new ImageLoader();
+        while (di.hdfsIterator.hasNext() && i<batchSize){
+            LocatedFileStatus file = di.hdfsIterator.next();
+            Path path = file.getPath();
+
+            //Get image label
+            String label = path.getName().split("_")[1].split("\\.")[0];
+            INDArray labelVect = labels.get(label);
+
+            //Image vectorization
+            DataInputStream dis = fs.open(path);
+            INDArray img = imageLoader.asMatrix(dis);
+            dis.close();
+
+            //Add image and label to list
+            dsImages.add(img);
+            dsLabels.add(labelVect);
+
+            i++;
+        }
+        //Generate DataSet
+        int[] featureShape = dsImages.get(0).shape();
+        int[] labelShape = dsLabels.get(0).shape();
+        DataSet imageDataset = new DataSet(Nd4j.create(dsImages,new int[]{dsImages.size(),featureShape[0],featureShape[1]}),
+                Nd4j.create(dsLabels, new int[]{dsLabels.size(), labelShape[1]}));
+
+        return imageDataset;
     }
 
 }
