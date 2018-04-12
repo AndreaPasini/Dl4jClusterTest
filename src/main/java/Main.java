@@ -1,33 +1,23 @@
 
+import datasets.DatasetBuilder;
+import datasets.DirectoryIterator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.hash.Hash;
-import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.input.PortableDataStream;
-import org.apache.spark.partial.PartialResult;
 
 
 import org.apache.spark.sql.SparkSession;
 import org.datavec.image.loader.ImageLoader;
-import org.deeplearning4j.datasets.iterator.impl.CifarDataSetIterator;
-import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.cpu.nativecpu.NDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
-import scala.Tuple2;
 
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
 
-import javax.xml.crypto.Data;
 import java.io.*;
-import java.net.URI;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -58,12 +48,20 @@ public class Main {
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
         System.out.println("testprint");
 
+        DatasetBuilder dsb;
+        if (runLocal)
+            dsb = new DatasetBuilder(sc,"./data/cifar/train/");
+        else
+            dsb = new DatasetBuilder(sc,"hdfs://BigDataHA/user/pasini/data/cifar/train/");
+
+
+
         //Reading Class Labels
         Map<String, INDArray> labels;
         if (runLocal)
-            labels = DatasetBuilder.readClassLabels(sc,"./data/cifar/labels.txt");
+            labels = dsb.readClassLabels("./data/cifar/labels.txt");
         else
-            labels = DatasetBuilder.readClassLabels(sc,"hdfs://BigDataHA/user/pasini/data/cifar/labels.txt");
+            labels = dsb.readClassLabels("hdfs://BigDataHA/user/pasini/data/cifar/labels.txt");
 
         for (Map.Entry<String, INDArray> e : labels.entrySet()){
             System.out.println(e.getKey()+" "+e.getValue());
@@ -71,17 +69,9 @@ public class Main {
 
 
         //Reading training set images
-        DirectoryIterator di = new DirectoryIterator();
-        if (runLocal)
-            di.initIterator("./data/cifar/train/",sc);
-        else
-            di.initIterator("hdfs://BigDataHA/user/pasini/data/cifar/train/",sc);
-        Configuration conf = sc.hadoopConfiguration();
-        FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);
-
         List<DataSet> batches = new LinkedList<>();
         for (int i=0; i<50; i++) {
-            batches.add(nextBatch(di, labels, fs, 1000));
+            batches.add(dsb.nextBatch(1000));
             System.out.println("batch: "+i+" "+batches.get(batches.size()-1).getFeatures().shape()[0]);
         }
 
@@ -208,39 +198,6 @@ public class Main {
       //  System.exit(0);
     }
 
-    public static DataSet nextBatch(DirectoryIterator di, Map<String, INDArray> labels, FileSystem fs, int batchSize) throws IOException {
-        List<INDArray> dsImages = new LinkedList<>();
-        List<INDArray> dsLabels = new LinkedList<>();
 
-        List<DataSet> images=new LinkedList<>();
-        int i=0;
-        ImageLoader imageLoader = new ImageLoader();
-        while (di.hdfsIterator.hasNext() && i<batchSize){
-            LocatedFileStatus file = di.hdfsIterator.next();
-            Path path = file.getPath();
-
-            //Get image label
-            String label = path.getName().split("_")[1].split("\\.")[0];
-            INDArray labelVect = labels.get(label);
-
-            //Image vectorization
-            DataInputStream dis = fs.open(path);
-            INDArray img = imageLoader.asMatrix(dis);
-            dis.close();
-
-            //Add image and label to list
-            dsImages.add(img);
-            dsLabels.add(labelVect);
-
-            i++;
-        }
-        //Generate DataSet
-        int[] featureShape = dsImages.get(0).shape();
-        int[] labelShape = dsLabels.get(0).shape();
-        DataSet imageDataset = new DataSet(Nd4j.create(dsImages,new int[]{dsImages.size(),featureShape[0],featureShape[1]}),
-                Nd4j.create(dsLabels, new int[]{dsLabels.size(), labelShape[1]}));
-
-        return imageDataset;
-    }
 
 }
