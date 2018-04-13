@@ -15,6 +15,7 @@ import utils.Utils;
 import scala.Tuple2;
 
 import java.io.DataInputStream;
+import java.util.Map;
 
 /**
  * Created by francescoventura on 12/04/18.
@@ -30,19 +31,29 @@ public class MainPreprocessing {
         //Creating Spark Session
         SparkSession ss;
         boolean runLocal = false;
+        String localConf = null;
 
-        if(args.length > 0){
+        if(args.length < 1){
+            System.out.println("<input_path>");
+        }
+
+        if(System.getenv("CLUSTER_TEST_LOCAL") != null){
             runLocal = true;
+            localConf = System.getenv("CLUSTER_TEST_LOCAL");
         }
 
         if (runLocal)
-            ss = SparkSession.builder().master(args[0]).appName(appName)
+            ss = SparkSession.builder().master(localConf).appName(appName)
                     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
                     .config("spark.kryoserializer.buffer.mb","4")
-                    //.config("spark.files.maxPartitionBytes","6")
+                    .config("spark.files.maxPartitionBytes","24")
                     .getOrCreate();
         else
-            ss =  SparkSession.builder().appName(appName).getOrCreate();
+            ss =  SparkSession.builder().appName(appName)
+                    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+                    .config("spark.kryoserializer.buffer.mb","4")
+                    //.config("spark.files.maxPartitionBytes","24")
+                    .getOrCreate();
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
 
         System.out.println("Running preprocessing");
@@ -50,9 +61,11 @@ public class MainPreprocessing {
         //Reading dataset
        JavaPairRDD<String, PortableDataStream> binaryRDD;
         if (runLocal)
-            binaryRDD = sc.binaryFiles("./data/cifar/train/*");
+            binaryRDD = sc.binaryFiles(args[0]);
         else
-            binaryRDD = sc.binaryFiles("hdfs://BigDataHA/user/pasini/data/cifar/train/*");
+            //har:///user/ventura/dataset/cifar/cifar_train.har
+            //binaryRDD = sc.binaryFiles("hdfs://BigDataHA/user/pasini/data/cifar/train/*");
+            binaryRDD = sc.binaryFiles(args[0]);
         //JavaRDD<String> fileNames=binaryRDD.sample(false, 0.001).map(Tuple2::_1);//countApprox(10000);
 
         JavaPairRDD<String,INDArray> res = binaryRDD.mapToPair(kds  -> {
@@ -67,11 +80,12 @@ public class MainPreprocessing {
             return new Tuple2<>(imageId,img);
         });
 
-        String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName());
+        String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".",""));
         if(runLocal){
             res.saveAsTextFile(outFolder);
         } else{
-            res.saveAsObjectFile(outFolder);
+            res.repartition(1).saveAsObjectFile(outFolder);
+            res.repartition(1).saveAsTextFile(Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".","")) + "_text_");
         }
 
 
