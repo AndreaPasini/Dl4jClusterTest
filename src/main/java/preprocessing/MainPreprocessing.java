@@ -25,7 +25,7 @@ public class MainPreprocessing {
     private static String appName = "Dl4jPreprocessing";
 
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
 
         System.out.println("Starting job...");
         //Creating Spark Session
@@ -33,11 +33,11 @@ public class MainPreprocessing {
         boolean runLocal = false;
         String localConf = null;
 
-        if(args.length < 1){
+        if (args.length < 1) {
             System.out.println("<input_path>");
         }
 
-        if(System.getenv("CLUSTER_TEST_LOCAL") != null){
+        if (System.getenv("CLUSTER_TEST_LOCAL") != null) {
             runLocal = true;
             localConf = System.getenv("CLUSTER_TEST_LOCAL");
         }
@@ -45,13 +45,13 @@ public class MainPreprocessing {
         if (runLocal)
             ss = SparkSession.builder().master(localConf).appName(appName)
                     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                    .config("spark.kryoserializer.buffer.mb","4")
-                    .config("spark.files.maxPartitionBytes","24")
+                    .config("spark.kryoserializer.buffer.mb", "4")
+                    .config("spark.files.maxPartitionBytes", "2400000")
                     .getOrCreate();
         else
-            ss =  SparkSession.builder().appName(appName)
+            ss = SparkSession.builder().appName(appName)
                     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                    .config("spark.kryoserializer.buffer.mb","4")
+                    .config("spark.kryoserializer.buffer.mb", "4")
                     //.config("spark.files.maxPartitionBytes","24")
                     .getOrCreate();
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
@@ -59,33 +59,27 @@ public class MainPreprocessing {
         System.out.println("Running preprocessing");
 
         //Reading dataset
-       JavaPairRDD<String, PortableDataStream> binaryRDD;
-        if (runLocal)
-            binaryRDD = sc.binaryFiles(args[0]);
-        else
-            //har:///user/ventura/dataset/cifar/cifar_train.har
-            //binaryRDD = sc.binaryFiles("hdfs://BigDataHA/user/pasini/data/cifar/train/*");
-            binaryRDD = sc.binaryFiles(args[0]);
-        //JavaRDD<String> fileNames=binaryRDD.sample(false, 0.001).map(Tuple2::_1);//countApprox(10000);
+        JavaPairRDD<String, PortableDataStream> binaryRDD = sc.binaryFiles(args[0]);
 
-        JavaPairRDD<String,INDArray> res = binaryRDD.mapToPair(kds  -> {
-            String imageId = Utils.getFileNameFromURI( kds._1);
+        JavaPairRDD<String, INDArray> res = binaryRDD.mapToPair(kds -> {
+            String imageId = Utils.getFileNameFromURI(kds._1);
             PortableDataStream ds = kds._2;
-
 
             DataInputStream dis = ds.open();
             ImageLoader il = new ImageLoader();
             INDArray img = il.asMatrix(dis);
             dis.close();
-            return new Tuple2<>(imageId,img);
+            return new Tuple2<>(imageId, img);
         });
 
-        String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".",""));
-        if(runLocal){
-            res.saveAsTextFile(outFolder);
-        } else{
-            res.repartition(1).saveAsObjectFile(outFolder);
-            res.repartition(1).saveAsTextFile(Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".","")) + "_text_");
+        String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".", ""));
+        if (runLocal) {
+            res.coalesce(1).saveAsTextFile(outFolder);
+            res.coalesce(1).saveAsTextFile(outFolder + "_text");
+
+        } else {
+            res.saveAsObjectFile(outFolder);
+            //res.saveAsTextFile(outFolder + "_text");
         }
 
 
