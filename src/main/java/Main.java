@@ -59,9 +59,9 @@ public class Main {
         //Reading Class Labels
         Map<String, INDArray> labels;
         if (runLocal)
-            labels = dsb.readClassLabels("./data/cifar/labels.txt");
+            labels = dsb.readClassLabels("./data/cifar/labels.txt",sc);
         else
-            labels = dsb.readClassLabels("hdfs://BigDataHA/user/pasini/data/cifar/labels.txt");
+            labels = dsb.readClassLabels("hdfs://BigDataHA/user/pasini/data/cifar/labels.txt", sc);
 
         for (Map.Entry<String, INDArray> e : labels.entrySet()){
             System.out.println(e.getKey()+" "+e.getValue());

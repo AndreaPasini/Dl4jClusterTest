@@ -3,6 +3,7 @@ package datasets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.datavec.image.loader.ImageLoader;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -16,10 +17,10 @@ import java.util.List;
 import java.util.Map;
 
 public class DatasetBuilder {
-    private JavaSparkContext sc;                    //Spark context
+    static private JavaSparkContext sc;                    //Spark context
     private FileSystem fs;                          //File system manager
     private DirectoryIterator di;                   //Directory iterator (dataset files)
-    private Map<String, INDArray> classLabels;      //Class labels and 1-hot vectors for this dataset
+    static private Map<String, INDArray> classLabels;      //Class labels and 1-hot vectors for this dataset
 
     /**
      * Constructor.
@@ -36,9 +37,9 @@ public class DatasetBuilder {
     /**
      * Read file with class label list and produces the Map<classLabel, oneHotVector>
      */
-    public Map<String, INDArray> readClassLabels(String path) throws IOException {
+    static public Map<String, INDArray> readClassLabels(String path,JavaSparkContext sc) throws IOException {
         classLabels=new HashMap<>();
-        DataInputStream dis = getFileStream(path);
+        DataInputStream dis = getFileStream(path,sc);
         BufferedReader br = new BufferedReader(new InputStreamReader(dis));
 
         String line;
@@ -59,7 +60,7 @@ public class DatasetBuilder {
     /**
      * Open dataInputStream from path.
      */
-    public DataInputStream getFileStream(String path) throws IOException {
+    static public DataInputStream getFileStream(String path, JavaSparkContext sc) throws IOException {
         //Get filesystem object
         Configuration conf = sc.hadoopConfiguration();
         FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);

@@ -9,12 +9,20 @@ import org.datavec.image.loader.ImageLoader;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.cpu.nativecpu.NDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.serde.binary.BinarySerde;
 import scala.Product2;
 import utils.Utils;
 import scala.Tuple2;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.nio.ByteBuffer;
 import java.util.Map;
 
 /**
@@ -61,7 +69,7 @@ public class MainPreprocessing {
         //Reading dataset
         JavaPairRDD<String, PortableDataStream> binaryRDD = sc.binaryFiles(args[0]);
 
-        JavaPairRDD<String, INDArray> res = binaryRDD.mapToPair(kds -> {
+        JavaRDD<Tuple2<String, INDArray>> res = binaryRDD.map(kds -> {
             String imageId = Utils.getFileNameFromURI(kds._1);
             PortableDataStream ds = kds._2;
 
@@ -69,33 +77,22 @@ public class MainPreprocessing {
             ImageLoader il = new ImageLoader();
             INDArray img = il.asMatrix(dis);
             dis.close();
+
             return new Tuple2<>(imageId, img);
         });
 
+
+        res.cache();
+
         String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".", ""));
         if (runLocal) {
-            res.coalesce(1).saveAsTextFile(outFolder);
-            res.coalesce(1).saveAsTextFile(outFolder + "_text");
+            res.coalesce(1).saveAsObjectFile(outFolder);
+            //res.coalesce(1).saveAsTextFile(outFolder + "_text");
 
         } else {
             res.saveAsObjectFile(outFolder);
             //res.saveAsTextFile(outFolder + "_text");
         }
-
-
-        //Long l = fileNames.count();
-        //System.out.println("ciao");
-        //Image vectorization
-        /*JavaPairRDD<String,String> res = binaryRDD.mapValues(ds -> {
-//            DataInputStream dis = ds.open();
-//            ImageLoader il = new ImageLoader();
-//            INDArray img = il.asMatrix(dis);
-//            dis.close();
-//
-//            return img.shapeInfoToString();
-            return "pippo";
-        });*/
-        //res.saveAsTextFile("./outputSpark");
 
     }
 }
