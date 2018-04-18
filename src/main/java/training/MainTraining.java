@@ -64,6 +64,7 @@ public class MainTraining {
                     .getOrCreate();
         else
             ss = SparkSession.builder().appName(appName)
+                    //NON USARE KRYO MAAAAAAI!!!!!!
                     //.config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
                     //.config("spark.kryoserializer.buffer.mb", "4")
                     //.config("spark.files.maxPartitionBytes","24")
@@ -86,11 +87,11 @@ public class MainTraining {
         }).groupByKey();
 
 
-        indexedRDD.take(10).forEach(r -> {
-            System.out.print(r._1 + " - ");
-            r._2.forEach(r2->System.out.print(r2._2.shapeInfoToString()));
-            System.out.println();
-        });
+//        indexedRDD.take(10).forEach(r -> {
+//            System.out.print(r._1 + " - ");
+//            r._2.forEach(r2->System.out.print(r2._2.shapeInfoToString()));
+//            System.out.println();
+//        });
 
         Map<String, INDArray> labels = readClassLabels("file:///Users/francescoventura/IdeaProjects/Dl4jClusterTest/data/cifar/labels.txt", sc);
         final Broadcast<Map<String, INDArray>> bLabels = sc.broadcast(labels);
@@ -126,7 +127,7 @@ public class MainTraining {
             return imageDataset;
         });
 
-        datsetRDD.foreach(r -> {
+        datsetRDD.take(10).forEach(r -> {
             System.out.println(String.format("Batch id:%d - size: %d -> %s",r._1,r._2.getFeatures().length(),r._2.getFeatures().shapeInfoToString()));
             System.out.println();
         });
