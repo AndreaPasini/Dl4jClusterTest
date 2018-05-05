@@ -32,7 +32,16 @@ public class MainPreprocessing {
 
     private static String appName = "Dl4jPreprocessing";
 
-
+    /**
+     * This method takes as input a dataset of images in form of ".har" file.
+     *   Since reading millions of files is very slow with HDFS, these are grouped together into a hadoop archive (.har).
+     *   The archive can be created with: "hadoop archive" command.
+     * Output: produces a RDD<"imageName",INDArray> (serialized images, ready for dl4j usage)
+     *
+     * Usage:
+     * Add "CLUSTER_TEST_LOCAL" environment var for setting the local configuration.
+     * @param args: arg[0]=input path with files to be merged
+     */
     public static void main(String[] args) {
 
         System.out.println("Starting job...");
@@ -45,11 +54,13 @@ public class MainPreprocessing {
             System.out.println("<input_path>");
         }
 
+        //Get local configuration from environment variables (command line)
         if (System.getenv("CLUSTER_TEST_LOCAL") != null) {
             runLocal = true;
             localConf = System.getenv("CLUSTER_TEST_LOCAL");
         }
 
+        //Create spark session
         if (runLocal)
             ss = SparkSession.builder().master(localConf).appName(appName)
                     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
@@ -66,13 +77,14 @@ public class MainPreprocessing {
 
         System.out.println("Running preprocessing");
 
-        //Reading dataset
+        //Reading dataset ".har"
+        //Returns a RDD with the files into the archive. RDD<"filename",filestream>
         JavaPairRDD<String, PortableDataStream> binaryRDD = sc.binaryFiles(args[0]);
-
+        //Image vectorization
         JavaRDD<Tuple2<String, INDArray>> res = binaryRDD.map(kds -> {
             String imageId = Utils.getFileNameFromURI(kds._1);
             PortableDataStream ds = kds._2;
-
+            //generate INDArray from image data
             DataInputStream dis = ds.open();
             ImageLoader il = new ImageLoader();
             INDArray img = il.asMatrix(dis);
@@ -81,18 +93,15 @@ public class MainPreprocessing {
             return new Tuple2<>(imageId, img);
         });
 
-
         res.cache();
 
+        //Save the generated RDD
         String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".", ""));
         if (runLocal) {
+            //only 1 output partition
             res.coalesce(1).saveAsObjectFile(outFolder);
-            //res.coalesce(1).saveAsTextFile(outFolder + "_text");
-
         } else {
             res.saveAsObjectFile(outFolder);
-            //res.saveAsTextFile(outFolder + "_text");
         }
-
     }
 }
