@@ -79,9 +79,15 @@ public class Main {
 
         //Create RDD with the dataset
         JavaRDD<DataSet> datasetRDD = sc.parallelize(batches);
-        datasetRDD.map(d-> d.getFeatures().shape()[0]+" "+d.getFeatures().shape()[1]+" "+d.getFeatures().shape()[2]).saveAsTextFile("cifarOutput");
+        datasetRDD.saveAsObjectFile("outputDatasetCifar");
 
         System.out.println("end parallelization");
+
+        System.out.println("reloading");
+
+        JavaRDD<DataSet> reloaded = sc.objectFile("outputDatasetCifar");
+        long num = reloaded.count();
+        System.out.println("End: numbatches="+num);
 
 
 
@@ -92,9 +98,6 @@ public class Main {
 
 
         //CifarDataSetIterator
-
-
-
 
 
 
