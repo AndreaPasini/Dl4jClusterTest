@@ -39,7 +39,6 @@ public class MainPreprocessing {
      * Output: produces a RDD<"imageName",INDArray> (serialized images, ready for dl4j usage)
      *
      * Usage:
-     * Add "CLUSTER_TEST_LOCAL" environment var for setting the local configuration.
      * @param args: arg[0]=input path with files to be merged
      */
     public static void main(String[] args) {
@@ -54,7 +53,7 @@ public class MainPreprocessing {
             System.out.println("<input_path>");
         }
 
-        //Get local configuration from environment variables (command line)
+        //Get local configuration from spark environment variables
         if (System.getenv("CLUSTER_TEST_LOCAL") != null) {
             runLocal = true;
             localConf = System.getenv("CLUSTER_TEST_LOCAL");
@@ -77,7 +76,7 @@ public class MainPreprocessing {
 
         System.out.println("Running preprocessing");
 
-        //Reading dataset ".har"
+        //Reading dataset file ".har" (archive of images)
         //Returns a RDD with the files into the archive. RDD<"filename",filestream>
         JavaPairRDD<String, PortableDataStream> binaryRDD = sc.binaryFiles(args[0]);
         //Image vectorization
@@ -92,8 +91,6 @@ public class MainPreprocessing {
 
             return new Tuple2<>(imageId, img);
         });
-
-        res.cache();
 
         //Save the generated RDD
         String outFolder = Utils.getOutFolderName(MainPreprocessing.class.getName().replace(".", ""));

@@ -1,0 +1,155 @@
+package training;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.broadcast.Broadcast;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.dataset.DataSet;
+import org.nd4j.linalg.factory.Nd4j;
+import scala.Tuple2;
+
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+
+/**
+ * Created by andreapasini on 06/05/18.
+ * Distributed Dataset structure.
+ * Methods:
+ *  Read dataset (from serialized INDArray images) and divide into batches.
+ */
+public class DistributedDataset {
+    private JavaSparkContext sc;                        //Java spark context
+    private int batchSize;                              //batch size
+    private int numBatches;                             //number of batches
+    private long numSamples;                            //number of samples
+    private Map<String, INDArray> labels;               //dataset labels
+    private Broadcast<Map<String, INDArray>> bLabels;   //dataset labels (broadcast var)
+    private JavaPairRDD<Integer,DataSet> data;          //dataset batches
+
+    /**
+     * Constructor
+     * @param sc JavaSparkContext
+     * @param batchSize the batch size for training (num images)
+     */
+    public DistributedDataset(JavaSparkContext sc, int batchSize) {
+        this.sc = sc;
+        this.batchSize = batchSize;
+    }
+
+    /**
+     * Open dataInputStream from path.
+     */
+    public DataInputStream getFileStream(String path) throws IOException {
+        //Get filesystem object
+        Configuration conf = sc.hadoopConfiguration();
+        FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);
+
+        //Return DataInputStream
+        return fs.open(new Path(path));
+    }
+
+    /**
+     * Load labels from file (list of labels)
+     * Generate 1-hot vectors.
+     */
+    public Map<String, INDArray> loadLabels(String inputFile) throws IOException {
+        labels=new HashMap<>();
+        DataInputStream dis = getFileStream(inputFile);
+        BufferedReader br = new BufferedReader(new InputStreamReader(dis));
+
+        String line;
+        //Read the list of labels
+        List<String> labelList = new LinkedList<>();
+        while ((line=br.readLine())!=null)
+            labelList.add(line);
+        int i=0;
+        //Generate 1-hot vectors
+        for (String label : labelList) {
+            float[] label1Hot = new float[labelList.size()];
+            label1Hot[i] = 1;
+            labels.put(label, Nd4j.create(label1Hot));
+            i++;
+        }
+
+        //Broadcast variable
+        bLabels = sc.broadcast(labels);
+        if (bLabels == null)
+            throw new IOException();
+        return labels;
+    }
+
+    /**
+     * Read vectorized input images (file with RDD<filename, INDArray>)
+     * Generate the training set batches: RDD<batchId, DataSet>
+     * @param inputPath: path with the input RDD
+     */
+    public JavaPairRDD<Integer,DataSet> loadSerializedDataset(String inputPath) {
+
+        //Read serialized images (NDArray)
+        JavaRDD<Tuple2<String, INDArray>> binaryImagesRDD = sc.objectFile(inputPath);
+        //Obtain an index for each sample
+        JavaPairRDD<Tuple2<String, INDArray>, Long> indexedImagesRDD = binaryImagesRDD.zipWithIndex();
+        indexedImagesRDD.cache();
+        //Compute the number of samples and batches
+        numSamples = indexedImagesRDD.count();
+        numBatches = (int)Math.ceil(1.0*numSamples/batchSize);
+
+        final int numBatchesLocal=numBatches;
+        final Broadcast<Map<String,INDArray>> bLabelsLocal=bLabels;
+
+        //Divide samples into batches RDD<batchId, images>
+        JavaPairRDD<Integer, Iterable<Tuple2<String, INDArray>>> batchesRDD = indexedImagesRDD.mapToPair(p -> {
+            Long index = p._2;    //Sample index
+            return new Tuple2<>(new Integer((int)(index % numBatchesLocal)), p._1);
+        }).groupByKey();
+
+        //Generating datasets, 1 for each batch: RDD<batchId,Dataset>
+        JavaPairRDD<Integer,DataSet> datsetRDD = batchesRDD.mapValues(batch -> {
+            LinkedList<INDArray> dsImages = new LinkedList<>();//IndArray for each sample (image)
+            LinkedList<INDArray> dsLabels = new LinkedList<>();//IndArray for each sample (label)
+
+            //Iterates over samples in the batch
+            batch.forEach(t -> {
+                String label = t._1.split("_")[1];//label from filename
+                INDArray lind = bLabelsLocal.value().get(label);//vectorized label
+                dsImages.addLast(t._2);
+                dsLabels.addLast(lind);
+            });
+
+            //Generate DataSet
+            int[] featureShape = dsImages.get(0).shape(); //image shape
+            int[] labelShape = dsLabels.get(0).shape();   //vectorized label shape
+            DataSet batchDataset = new DataSet(
+                    Nd4j.create(dsImages,                 //features
+                            new int[]{dsImages.size(),
+                                featureShape[0],
+                                featureShape[1]}),
+                    Nd4j.create(dsLabels,                 //labels
+                            new int[]{dsLabels.size(),
+                                    labelShape[1]}));
+
+            return batchDataset;
+        });
+
+        datsetRDD.cache();
+        return datsetRDD;
+    }
+
+    //Getters
+    public final int getBatchSize() { return batchSize; }
+    public final int getNumBatches() { return numBatches; }
+    public final long getNumSamples() { return numSamples; }
+    public final Map<String, INDArray> getLabels() { return labels; }
+    public final Broadcast<Map<String, INDArray>> getLabelsBroadcast() { return bLabels; }
+}
