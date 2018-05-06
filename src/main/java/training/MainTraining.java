@@ -63,17 +63,17 @@ public class MainTraining {
      * Workflow
      */
     static void run(JavaSparkContext sc, String inputPath, String inputLabels) throws IOException {
-        //Create dataset reader
-        DistributedDataset dDataset = new DistributedDataset(sc, 100);
+        //Read training set
+        System.out.println("Reading Training Set...");
+        DistributedDataset trainingSet = new DistributedDataset(sc, 100, inputLabels, inputPath);
 
-        //Reading dataset
-        dDataset.loadLabels(inputLabels);
-        JavaPairRDD<Integer,DataSet>  datasetRDD = dDataset.loadSerializedDataset(inputPath);
+        //Printing
+//        trainingSet.getDatasetRDD().take(10).forEach(r -> {
+//            System.out.println(String.format("Batch id:%d - size: %d -> %s",r._1,r._2.getFeatures().length(),r._2.getFeatures().shapeInfoToString()));
+//            System.out.println();
+//        });
 
-        datasetRDD.take(10).forEach(r -> {
-            System.out.println(String.format("Batch id:%d - size: %d -> %s",r._1,r._2.getFeatures().length(),r._2.getFeatures().shapeInfoToString()));
-            System.out.println();
-        });
-
+        //Preparing for training
+        DistributedTraining dTraining = new DistributedTraining(trainingSet);
     }
 }

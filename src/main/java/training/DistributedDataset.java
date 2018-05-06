@@ -35,22 +35,26 @@ public class DistributedDataset {
     private long numSamples;                            //number of samples
     private Map<String, INDArray> labels;               //dataset labels
     private Broadcast<Map<String, INDArray>> bLabels;   //dataset labels (broadcast var)
-    private JavaPairRDD<Integer,DataSet> data;          //dataset batches
+    private JavaPairRDD<Integer,DataSet>  dataRDD;      //dataset batches RDD<batchId, dataset>
 
     /**
      * Constructor
      * @param sc JavaSparkContext
      * @param batchSize the batch size for training (num images)
+     * @param inputLabels input file with labels list
+     * @param inputPath input RDD<filename,INDArray>
      */
-    public DistributedDataset(JavaSparkContext sc, int batchSize) {
+    public DistributedDataset(JavaSparkContext sc, int batchSize, String inputLabels, String inputPath) throws IOException {
         this.sc = sc;
         this.batchSize = batchSize;
+        loadLabels(inputLabels);
+        loadSerializedDataset(inputPath);
     }
 
     /**
      * Open dataInputStream from path.
      */
-    public DataInputStream getFileStream(String path) throws IOException {
+    private DataInputStream getFileStream(String path) throws IOException {
         //Get filesystem object
         Configuration conf = sc.hadoopConfiguration();
         FileSystem fs = org.apache.hadoop.fs.FileSystem.get(conf);
@@ -63,7 +67,7 @@ public class DistributedDataset {
      * Load labels from file (list of labels)
      * Generate 1-hot vectors.
      */
-    public Map<String, INDArray> loadLabels(String inputFile) throws IOException {
+    private Map<String, INDArray> loadLabels(String inputFile) throws IOException {
         labels=new HashMap<>();
         DataInputStream dis = getFileStream(inputFile);
         BufferedReader br = new BufferedReader(new InputStreamReader(dis));
@@ -94,7 +98,7 @@ public class DistributedDataset {
      * Generate the training set batches: RDD<batchId, DataSet>
      * @param inputPath: path with the input RDD
      */
-    public JavaPairRDD<Integer,DataSet> loadSerializedDataset(String inputPath) {
+    private JavaPairRDD<Integer,DataSet> loadSerializedDataset(String inputPath) {
 
         //Read serialized images (NDArray)
         JavaRDD<Tuple2<String, INDArray>> binaryImagesRDD = sc.objectFile(inputPath);
@@ -104,25 +108,24 @@ public class DistributedDataset {
         //Compute the number of samples and batches
         numSamples = indexedImagesRDD.count();
         numBatches = (int)Math.ceil(1.0*numSamples/batchSize);
-
-        final int numBatchesLocal=numBatches;
-        final Broadcast<Map<String,INDArray>> bLabelsLocal=bLabels;
+        final int numBatchesFinal = numBatches;
+        final Broadcast<Map<String,INDArray>> blabelsFinal = bLabels;
 
         //Divide samples into batches RDD<batchId, images>
         JavaPairRDD<Integer, Iterable<Tuple2<String, INDArray>>> batchesRDD = indexedImagesRDD.mapToPair(p -> {
             Long index = p._2;    //Sample index
-            return new Tuple2<>(new Integer((int)(index % numBatchesLocal)), p._1);
+            return new Tuple2<>((int)(index % numBatchesFinal), p._1);
         }).groupByKey();
 
         //Generating datasets, 1 for each batch: RDD<batchId,Dataset>
-        JavaPairRDD<Integer,DataSet> datsetRDD = batchesRDD.mapValues(batch -> {
+        dataRDD = batchesRDD.mapValues(batch -> {
             LinkedList<INDArray> dsImages = new LinkedList<>();//IndArray for each sample (image)
             LinkedList<INDArray> dsLabels = new LinkedList<>();//IndArray for each sample (label)
 
             //Iterates over samples in the batch
             batch.forEach(t -> {
                 String label = t._1.split("_")[1];//label from filename
-                INDArray lind = bLabelsLocal.value().get(label);//vectorized label
+                INDArray lind = blabelsFinal.value().get(label);//vectorized label
                 dsImages.addLast(t._2);
                 dsLabels.addLast(lind);
             });
@@ -130,7 +133,7 @@ public class DistributedDataset {
             //Generate DataSet
             int[] featureShape = dsImages.get(0).shape(); //image shape
             int[] labelShape = dsLabels.get(0).shape();   //vectorized label shape
-            DataSet batchDataset = new DataSet(
+            return new DataSet(
                     Nd4j.create(dsImages,                 //features
                             new int[]{dsImages.size(),
                                 featureShape[0],
@@ -139,17 +142,17 @@ public class DistributedDataset {
                             new int[]{dsLabels.size(),
                                     labelShape[1]}));
 
-            return batchDataset;
         });
 
-        datsetRDD.cache();
-        return datsetRDD;
+        dataRDD.cache();
+        return dataRDD;
     }
 
     //Getters
-    public final int getBatchSize() { return batchSize; }
-    public final int getNumBatches() { return numBatches; }
-    public final long getNumSamples() { return numSamples; }
-    public final Map<String, INDArray> getLabels() { return labels; }
-    public final Broadcast<Map<String, INDArray>> getLabelsBroadcast() { return bLabels; }
+    public int getBatchSize() { return batchSize; }
+    public int getNumBatches() { return numBatches; }
+    public long getNumSamples() { return numSamples; }
+    public Map<String, INDArray> getLabels() { return labels; }
+    public Broadcast<Map<String, INDArray>> getLabelsBroadcast() { return bLabels; }
+    public JavaPairRDD<Integer, DataSet> getDatasetRDD() { return dataRDD; }
 }
