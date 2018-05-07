@@ -86,7 +86,7 @@ public class MainPreprocessing {
             //generate INDArray from image data
             DataInputStream dis = ds.open();
             ImageLoader il = new ImageLoader();
-            INDArray img = il.asMatrix(dis);
+            INDArray img = il.toBgr(dis); //BGR tensor, shape [3,height,width]
             dis.close();
 
             return new Tuple2<>(imageId, img);

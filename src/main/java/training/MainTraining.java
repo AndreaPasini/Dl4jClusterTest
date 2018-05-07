@@ -74,6 +74,6 @@ public class MainTraining {
 //        });
 
         //Preparing for training
-        DistributedTraining dTraining = new DistributedTraining(trainingSet);
+        DistributedTraining dTraining = new DistributedTraining(trainingSet, sc);
     }
 }

@@ -1,5 +1,6 @@
 # Loading jar to server
 scp target/ClusterTest1-1.0-jar-with-dependencies.jar ventura@bigdatalab.polito.it:dl4j
+scp target/ClusterTest1-1.0-jar-with-dependencies.jar pasini@bigdatalab.polito.it:deeplearningTest
 
 # HAR
 hadoop archive -archiveName cifar_train.har -p /user/pasini/data/cifar/train /user/ventura/dataset/cifar
