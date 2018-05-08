@@ -103,6 +103,5 @@ public class DistributedTraining {
 
         //Delete the temp training files, now that we are done with them
         tm.deleteTempFiles(sc);
-
     }
 }

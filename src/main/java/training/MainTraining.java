@@ -62,7 +62,8 @@ public class MainTraining {
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
 
         run(sc, args[0], args[1]);
-        return;
+        System.out.println("Done.");
+        System.exit(0);
     }
 
     static MultiLayerConfiguration getModelArchitecture() {

@@ -100,5 +100,6 @@ public class MainPreprocessing {
         } else {
             res.saveAsObjectFile(outFolder);
         }
+
     }
 }
