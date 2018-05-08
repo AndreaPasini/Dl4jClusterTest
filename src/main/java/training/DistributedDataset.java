@@ -27,6 +27,8 @@ import java.util.Map;
  * Distributed Dataset structure.
  * Methods:
  *  Read dataset (from serialized INDArray images) and divide into batches.
+ * Dataset shape:
+ *  NCHW convention, [minibatch, channel, height, width]
  */
 public class DistributedDataset {
     private JavaSparkContext sc;                        //Java spark context
@@ -35,7 +37,7 @@ public class DistributedDataset {
     private long numSamples;                            //number of samples
     private Map<String, INDArray> labels;               //dataset labels
     private Broadcast<Map<String, INDArray>> bLabels;   //dataset labels (broadcast var)
-    private JavaPairRDD<Integer,DataSet>  dataRDD;      //dataset batches RDD<batchId, dataset>
+    private JavaRDD<DataSet>  dataRDD;                  //dataset batches RDD<dataset>
 
     /**
      * Constructor
@@ -95,10 +97,10 @@ public class DistributedDataset {
 
     /**
      * Read vectorized input images (file with RDD<filename, INDArray>)
-     * Generate the training set batches: RDD<batchId, DataSet>
+     * Generate the training set batches: RDD<DataSet>
      * @param inputPath: path with the input RDD
      */
-    private JavaPairRDD<Integer,DataSet> loadSerializedDataset(String inputPath) {
+    private JavaRDD<DataSet> loadSerializedDataset(String inputPath) {
 
         //Read serialized images (NDArray)
         JavaRDD<Tuple2<String, INDArray>> binaryImagesRDD = sc.objectFile(inputPath);
@@ -118,12 +120,12 @@ public class DistributedDataset {
         }).groupByKey();
 
         //Generating datasets, 1 for each batch: RDD<batchId,Dataset>
-        dataRDD = batchesRDD.mapValues(batch -> {
+        dataRDD = batchesRDD.map(entry -> {
             LinkedList<INDArray> dsImages = new LinkedList<>();//IndArray for each sample (image)
             LinkedList<INDArray> dsLabels = new LinkedList<>();//IndArray for each sample (label)
 
             //Iterates over samples in the batch
-            batch.forEach(t -> {
+            entry._2().forEach(t -> {
                 String label = t._1.split("_")[1];//label from filename
                 INDArray lind = blabelsFinal.value().get(label);//vectorized label
                 dsImages.addLast(t._2);
@@ -135,16 +137,16 @@ public class DistributedDataset {
             int[] labelShape = dsLabels.get(0).shape();   //vectorized label shape
             return new DataSet(
                     Nd4j.create(dsImages,                 //features
-                            new int[]{dsImages.size(),
+                            new int[]{dsImages.size(),    //Shape=[numImages,nChannels,height,width]
                                 featureShape[0],
-                                featureShape[1]}),
+                                featureShape[1],
+                                featureShape[2]}),
                     Nd4j.create(dsLabels,                 //labels
                             new int[]{dsLabels.size(),
                                     labelShape[1]}));
 
         });
 
-        dataRDD.cache();
         return dataRDD;
     }
 
@@ -154,5 +156,5 @@ public class DistributedDataset {
     public long getNumSamples() { return numSamples; }
     public Map<String, INDArray> getLabels() { return labels; }
     public Broadcast<Map<String, INDArray>> getLabelsBroadcast() { return bLabels; }
-    public JavaPairRDD<Integer, DataSet> getDatasetRDD() { return dataRDD; }
+    public JavaRDD<DataSet> getDatasetRDD() { return dataRDD; }
 }

@@ -3,7 +3,15 @@ package training;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.*;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.dataset.DataSet;
+import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.IOException;
 
@@ -14,7 +22,7 @@ public class MainTraining {
 
     private static String appName = "Dl4jApplication";
     private static Integer NumPartitions = 10;
-
+    private static boolean runLocal = false;
     /**
      *
      * Input path: should contain files with RDD<"filename",INDArray> (vectorized images)
@@ -25,7 +33,7 @@ public class MainTraining {
         System.out.println("Starting job...");
         //Creating Spark Session
         SparkSession ss;
-        boolean runLocal = false;
+
         String localConf = null;
 
         //Input path:
@@ -53,10 +61,53 @@ public class MainTraining {
                     .getOrCreate();
         JavaSparkContext sc = new JavaSparkContext(ss.sparkContext());
 
-        System.out.println("Running preprocessing");
-
         run(sc, args[0], args[1]);
         return;
+    }
+
+    static MultiLayerConfiguration getModelArchitecture() {
+        int nChannels = 3;
+        int imgWidth = 32;
+        int imgHeight = 32;
+        int outputNum = 10;
+
+        return new NeuralNetConfiguration.Builder()
+                //.seed(seed)
+                .l2(0.0005)
+                .weightInit(WeightInit.XAVIER)
+                .updater(new Nesterovs(0.01, 0.9))
+                .list()
+                .layer(0, new ConvolutionLayer.Builder(5, 5)
+                        //nIn and nOut specify depth. nIn here is the nChannels and nOut is the number of filters to be applied
+                        .nIn(nChannels)
+                        .stride(1, 1)
+                        .nOut(20)
+                        .activation(Activation.IDENTITY)
+                        .build())
+                .layer(1, new SubsamplingLayer.Builder(PoolingType.MAX)
+                        .kernelSize(2,2)
+                        .stride(2,2)
+                        .build())
+                .layer(2, new ConvolutionLayer.Builder(5, 5)
+                        //Note that nIn need not be specified in later layers
+                        .stride(1, 1)
+                        .nOut(50)
+                        .activation(Activation.IDENTITY)
+                        .build())
+                .layer(3, new SubsamplingLayer.Builder(PoolingType.MAX)
+                        .kernelSize(2,2)
+                        .stride(2,2)
+                        .build())
+                .layer(4, new DenseLayer.Builder().activation(Activation.RELU)
+                        .nOut(500)
+                        .build())
+                .layer(5, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                        .nOut(outputNum)
+                        .activation(Activation.SOFTMAX)
+                        .build())
+                .setInputType(InputType.convolutional(imgHeight,imgWidth,nChannels)) //See note below
+                .backprop(true).pretrain(false).build();
+
     }
 
     /**
@@ -74,6 +125,8 @@ public class MainTraining {
 //        });
 
         //Preparing for training
-        DistributedTraining dTraining = new DistributedTraining(trainingSet, sc);
+        DistributedTraining dTraining = new DistributedTraining(sc, trainingSet, runLocal);
+        dTraining.setModel(getModelArchitecture());
+        dTraining.train(1);
     }
 }
